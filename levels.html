@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="no-js">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="SLG Protocol 等级板块：V1 至 V7 级差，按团队当期最大单累计业绩。" />
+<title>SLG Protocol · 等级</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070a0a'/%3E%3Cpath d='M16 5 26 10.7v10.6L16 27 6 21.3V10.7z' fill='none' stroke='%23c9f56a' stroke-width='1.8'/%3E%3Cpath d='M16 12.4 20 16l-4 3.6L12 16z' fill='%23c9f56a'/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#070a0a" />
+<link rel="stylesheet" href="assets/css/style.css" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://rpc-bsc.48.club https://bsc-rpc.publicnode.com https://bsc.blockrazor.xyz https://bsc-dataseed.bnbchain.org https://bsc.nodereal.io https://bsc-mainnet.public.blastapi.io https://bsc-dataseed2.defibit.io https://bsc-dataseed3.defibit.io https://bsc-dataseed4.defibit.io https://bsc.mytokenpocket.vip; base-uri 'none'; form-action 'none'; object-src 'none'" />
+</head>
+<body data-page="levels">
+
+<div class="atmos" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="index.html" aria-label="SLG Protocol">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.7 20.7 7.6v8.8L12 21.3 3.3 16.4V7.6z"/>
+          <path class="solid" d="M12 7.4 15.9 12 12 16.6 8.1 12z"/>
+        </svg>
+      </span>
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+    </a>
+    <nav class="nav">
+      <a href="index.html">总览</a>
+      <a href="nodes.html">节点</a>
+      <a href="stake.html">质押</a>
+      <a href="levels.html" class="is-active">等级</a>
+    </nav>
+    <div class="wallet">
+      <span class="chain-pill" id="chainPill" title="当前网络"><i class="dot"></i><span id="chainName">BSC</span></span>
+      <button class="btn btn-ghost btn-sm" id="connectBtn" type="button">
+        <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v2H7a3 3 0 0 0 0 6h13v2a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z"/><circle cx="17" cy="12" r="1.4"/></svg>
+        <span id="connectBtnText">连接钱包</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="wrap ticker-inner">
+    <span class="tick">SLG <b id="tSlgPrice">—</b></span>
+    <span class="tick">BNI <b id="tBniPrice">—</b></span>
+    <span class="tick">BNB <b id="tBnbPrice">—</b></span>
+  </div>
+</div>
+
+<main>
+
+  <section class="wrap page-head">
+    <div class="page-head-copy">
+      <span class="kicker"><i></i>LEVEL · V1 — V7</span>
+      <h1>团队业绩决定<span class="grad">级差比例</span></h1>
+      <p>
+        团队业绩等于下级每人当期最大单的美元价值之和，最多追溯 100 层。
+        续押同额不重复计数，出局立即扣减；等级随业绩实时下调。
+      </p>
+    </div>
+    <div class="page-head-side">
+      <div class="head-metric"><span>我的等级</span><b id="hpLevel">—</b></div>
+      <div class="head-metric"><span>团队业绩</span><b id="hpTeam">—</b></div>
+      <div class="head-metric"><span>最高占比</span><b id="hpMax">—</b></div>
+    </div>
+  </section>
+
+  <section class="wrap section tight">
+    <div class="card reveal">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">DIFFERENTIAL</span>
+          <h2>级差表</h2>
+        </div>
+        <span class="tag" id="myLevelTag">未定级</span>
+      </div>
+
+      <div class="level-table" id="levelTable" role="table" aria-label="等级表">
+        <div class="level-row level-head" role="row">
+          <span role="columnheader">等级</span>
+          <span role="columnheader">团队业绩</span>
+          <span role="columnheader">利息占比</span>
+          <span role="columnheader">状态</span>
+        </div>
+      </div>
+
+      <div class="cap-block">
+        <div class="cap-head">
+          <span>距离下一级</span>
+          <b id="lvNextText">—</b>
+        </div>
+        <div class="bar"><span id="lvNextBar"></span></div>
+        <div class="cap-foot">
+          <span>团队业绩 <b id="lvTeam">—</b></span>
+          <span>当前级差 <b id="lvRate">—</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="wrap section">
+    <div class="section-rule reveal">
+      <span class="idx">01</span>
+      <span class="line"></span>
+      <span class="eyebrow">计算口径</span>
+    </div>
+
+    <div class="flow-grid">
+      <article class="card flow-card reveal">
+        <span class="flow-index">VOLUME</span>
+        <h3>业绩如何计</h3>
+        <p class="flow-lead">只看当期最大单，不看累计流水。</p>
+        <ul class="rule-list">
+          <li>下级每人当前周期内最大单笔入金计一次</li>
+          <li>同额续押不增加上级业绩</li>
+          <li>加仓只把差额向上传递</li>
+          <li>出局后业绩立即从上级扣减</li>
+        </ul>
+      </article>
+
+      <article class="card flow-card reveal">
+        <span class="flow-index">PAYOUT</span>
+        <h3>奖励如何发</h3>
+        <p class="flow-lead">沿推荐链向上逐级补差，直到 60% 用尽。</p>
+        <ul class="rule-list">
+          <li>每级只拿与下一级之间的差额</li>
+          <li>未激活的上级占用级差位置但不领钱</li>
+          <li>动态收益计入本人出局额度</li>
+          <li>无有效订单时不产生任何动态收益</li>
+        </ul>
+      </article>
+
+      <article class="card flow-card reveal">
+        <span class="flow-index">EDGE</span>
+        <h3>边界情况</h3>
+        <p class="flow-lead">合约对以下情况有明确处理。</p>
+        <ul class="rule-list">
+          <li>首位质押人可无推荐人，份额进运营金库</li>
+          <li>推荐人必须已入金，否则拒绝绑定</li>
+          <li>推荐关系不可形成闭环</li>
+          <li>追溯深度上限 100 层</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+      <p>节点 · 质押 · 分红 一体化协议</p>
+    </div>
+    <div class="footer-meta">
+      <span>Network <b>BSC Mainnet · 56</b></span>
+      <span>Build <b id="footerVersion">v4.0</b></span>
+      <span>Source <b>实时链上读取</b></span>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>© 2026 SLG Protocol. 加密资产价格波动剧烈，参与前请独立评估风险。</span>
+    <span>本页面仅为合约交互界面，不构成任何投资建议。</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+<script src="assets/js/ethers.umd.min.js"></script>
+<script src="assets/js/config.js?v=16"></script>
+<script src="assets/js/app.js?v=20"></script>
+</body>
+</html>

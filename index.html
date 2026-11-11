@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="no-js">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="SLG Protocol · BNB Chain 上的节点与质押协议，实时读取链上状态。" />
+<title>SLG Protocol · 总览</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070a0a'/%3E%3Cpath d='M16 5 26 10.7v10.6L16 27 6 21.3V10.7z' fill='none' stroke='%23c9f56a' stroke-width='1.8'/%3E%3Cpath d='M16 12.4 20 16l-4 3.6L12 16z' fill='%23c9f56a'/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#070a0a" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://rpc-bsc.48.club https://bsc-rpc.publicnode.com https://bsc.blockrazor.xyz https://bsc-dataseed.bnbchain.org https://bsc.nodereal.io https://bsc-mainnet.public.blastapi.io https://bsc-dataseed2.defibit.io https://bsc-dataseed3.defibit.io https://bsc-dataseed4.defibit.io https://bsc.mytokenpocket.vip; base-uri 'none'; form-action 'none'; object-src 'none'" />
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body data-page="home">
+
+<div class="atmos" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="index.html" aria-label="SLG Protocol">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.7 20.7 7.6v8.8L12 21.3 3.3 16.4V7.6z"/>
+          <path class="solid" d="M12 7.4 15.9 12 12 16.6 8.1 12z"/>
+        </svg>
+      </span>
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+    </a>
+    <nav class="nav">
+      <a href="index.html" class="is-active">总览</a>
+      <a href="nodes.html">节点</a>
+      <a href="stake.html">质押</a>
+      <a href="levels.html">等级</a>
+    </nav>
+    <div class="wallet">
+      <span class="chain-pill" id="chainPill" title="当前网络"><i class="dot"></i><span id="chainName">BSC</span></span>
+      <button class="btn btn-ghost btn-sm" id="connectBtn" type="button">
+        <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v2H7a3 3 0 0 0 0 6h13v2a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z"/><circle cx="17" cy="12" r="1.4"/></svg>
+        <span id="connectBtnText">连接钱包</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="wrap landing">
+    <span class="kicker"><i></i>BNB CHAIN · LIVE</span>
+    <h1>SLG<span class="grad">Protocol</span>
+      <small>节点席位 · 轮内计息 · 续押释放</small>
+    </h1>
+    <p class="lede">
+      三个板块，各自独立。数据全部实时读取链上，交易直连钱包。
+    </p>
+  </section>
+
+  <section class="wrap entries">
+    <a class="pillar reveal" href="nodes.html">
+      <div class="pillar-top">
+        <span class="pillar-idx">01 / NODE</span>
+        <span class="pillar-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 20 8v8l-8 4.8L4 16V8z"/><path d="M12 8.4 16 11v2.6L12 16l-4-2.4V11z"/></svg>
+        </span>
+      </div>
+      <h3>节点</h3>
+      <p>创始 33 席、联创 99 席。购买即登记，永久参与利息的 20% 均分。</p>
+      <div class="pillar-foot">
+        <div class="pillar-figure">
+          <span>已售出</span>
+          <b id="pNodeSold">—</b>
+        </div>
+        <span class="pillar-go">进入
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="pillar reveal" href="stake.html">
+      <div class="pillar-top">
+        <span class="pillar-idx">02 / STAKE</span>
+        <span class="pillar-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M9.3 18V5M14.7 18v-6M20 18v-9"/><path d="M3 21h18"/></svg>
+        </span>
+      </div>
+      <h3>质押</h3>
+      <p>入金时 1% 兑换 BNI，此后每满一轮再从储备买入等值 1% 的 BNI，99% 计息。达到上限后附带 0.001 BNB 触发，BNB 原额退回。</p>
+      <div class="pillar-foot">
+        <div class="pillar-figure">
+          <span>质押人数</span>
+          <b id="pStake">—</b>
+        </div>
+        <span class="pillar-go">进入
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="pillar reveal" href="levels.html">
+      <div class="pillar-top">
+        <span class="pillar-idx">03 / LEVEL</span>
+        <span class="pillar-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 14.6 9l6 .9-4.3 4.2 1 6-5.3-2.8L6.7 20l1-6L3.4 9.9 9.4 9z"/></svg>
+        </span>
+      </div>
+      <h3>等级</h3>
+      <p>团队业绩按每人当期最大单累计，最多追溯 100 层。V1 至 V7 分享利息的 8% 至 60%。</p>
+      <div class="pillar-foot">
+        <div class="pillar-figure">
+          <span>最高级差</span>
+          <b id="pLevelRate">—</b>
+        </div>
+        <span class="pillar-go">进入
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </span>
+      </div>
+    </a>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+      <p>节点 · 质押 · 分红 一体化协议</p>
+    </div>
+    <div class="footer-meta">
+      <span>Network <b>BSC Mainnet · 56</b></span>
+      <span>Build <b id="footerVersion">v4.0</b></span>
+      <span>Source <b>实时链上读取</b></span>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>© 2026 SLG Protocol. 加密资产价格波动剧烈，参与前请独立评估风险。</span>
+    <span>本页面仅为合约交互界面，不构成任何投资建议。</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+<script src="assets/js/ethers.umd.min.js"></script>
+<script src="assets/js/config.js?v=16"></script>
+<script src="assets/js/app.js?v=20"></script>
+</body>
+</html>

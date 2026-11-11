@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="no-js">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="SLG Protocol 节点板块：创始 33 席、联创 99 席，永久参与利息的 20% 均分。" />
+<title>SLG Protocol · 节点</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070a0a'/%3E%3Cpath d='M16 5 26 10.7v10.6L16 27 6 21.3V10.7z' fill='none' stroke='%23c9f56a' stroke-width='1.8'/%3E%3Cpath d='M16 12.4 20 16l-4 3.6L12 16z' fill='%23c9f56a'/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#070a0a" />
+<link rel="stylesheet" href="assets/css/style.css" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://rpc-bsc.48.club https://bsc-rpc.publicnode.com https://bsc.blockrazor.xyz https://bsc-dataseed.bnbchain.org https://bsc.nodereal.io https://bsc-mainnet.public.blastapi.io https://bsc-dataseed2.defibit.io https://bsc-dataseed3.defibit.io https://bsc-dataseed4.defibit.io https://bsc.mytokenpocket.vip; base-uri 'none'; form-action 'none'; object-src 'none'" />
+</head>
+<body data-page="nodes">
+
+<div class="atmos" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="index.html" aria-label="SLG Protocol">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.7 20.7 7.6v8.8L12 21.3 3.3 16.4V7.6z"/>
+          <path class="solid" d="M12 7.4 15.9 12 12 16.6 8.1 12z"/>
+        </svg>
+      </span>
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+    </a>
+    <nav class="nav">
+      <a href="index.html">总览</a>
+      <a href="nodes.html" class="is-active">节点</a>
+      <a href="stake.html">质押</a>
+      <a href="levels.html">等级</a>
+    </nav>
+    <div class="wallet">
+      <span class="chain-pill" id="chainPill" title="当前网络"><i class="dot"></i><span id="chainName">BSC</span></span>
+      <button class="btn btn-ghost btn-sm" id="connectBtn" type="button">
+        <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v2H7a3 3 0 0 0 0 6h13v2a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z"/><circle cx="17" cy="12" r="1.4"/></svg>
+        <span id="connectBtnText">连接钱包</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="wrap ticker-inner">
+    <span class="tick">SLG <b id="tSlgPrice">—</b></span>
+    <span class="tick">BNI <b id="tBniPrice">—</b></span>
+    <span class="tick">BNB <b id="tBnbPrice">—</b></span>
+  </div>
+</div>
+
+<main>
+
+  <section class="wrap page-head">
+    <div class="page-head-copy">
+      <span class="kicker"><i></i>NODE PROGRAM · 132 SEATS</span>
+      <h1>两类节点，<span class="grad">永久分红席位</span></h1>
+      <p>
+        创始 33 席、联创 99 席。节点不参与本金，不承担利息，只按席位均分利息的 10% + 10%。
+        售完即止，分红随每笔利息发放实时结算。
+      </p>
+    </div>
+    <div class="page-head-side">
+      <div class="head-metric"><span>已售出</span><b id="hpSold">—</b></div>
+      <div class="head-metric"><span>剩余</span><b id="hpLeft">—</b></div>
+      <div class="head-metric"><span>累计分红</span><b id="hpDist">—</b></div>
+    </div>
+  </section>
+
+  <section class="wrap section tight">
+    <div class="node-grid">
+
+      <article class="card node-card reveal">
+        <div class="node-top">
+          <div class="node-title">
+            <span class="node-badge gold">FOUNDING · 33</span>
+            <h3>创始节点</h3>
+            <p>分享利息的 10%，由 33 席均分</p>
+          </div>
+          <div class="node-price">
+            <span>单价</span>
+            <b id="foundingPrice">—</b>
+            <small id="foundingPriceRule">按链上配置</small>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-head">
+            <span>已售 <b id="foundingSold">—</b> / 33</span>
+            <span>剩余 <b id="foundingLeft">—</b></span>
+          </div>
+          <div class="bar bar-lg"><span id="foundingBar"></span></div>
+        </div>
+
+        <div class="node-holdings">
+          <div class="holding">
+            <span>我的席位</span>
+            <b id="myFounding">—</b>
+          </div>
+          <div class="holding">
+            <span>待领分红</span>
+            <b id="foundingPending">—</b>
+            <button class="btn btn-mini btn-soft" id="btnClaimFounding" type="button" disabled>领取</button>
+          </div>
+        </div>
+
+        <div class="buy-form">
+          <label class="field">
+            <span>推荐人地址（可选）</span>
+            <input id="referrerFounding" type="text" placeholder="0x… 留空则推荐份额进入运营金库" autocomplete="off" spellcheck="false" />
+          </label>
+          <button class="btn btn-gold btn-block" id="btnBuyFounding" type="button" style="margin-top:12px">
+            <span class="btn-label">购买创始节点</span>
+            <span class="btn-amount" id="foundingPay">—</span>
+          </button>
+        </div>
+      </article>
+
+      <article class="card node-card mint reveal">
+        <div class="node-top">
+          <div class="node-title">
+            <span class="node-badge mint">CO-FOUNDER · 99</span>
+            <h3>联创节点</h3>
+            <p>分享利息的 10%，由 99 席均分</p>
+          </div>
+          <div class="node-price">
+            <span>单价</span>
+            <b id="coFounderPrice">—</b>
+            <small id="coFounderPriceRule">按链上配置</small>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-head">
+            <span>已售 <b id="coFounderSold">—</b> / 99</span>
+            <span>剩余 <b id="coFounderLeft">—</b></span>
+          </div>
+          <div class="bar bar-lg"><span id="coFounderBar"></span></div>
+        </div>
+
+        <div class="node-holdings">
+          <div class="holding">
+            <span>我的席位</span>
+            <b id="myCoFounder">—</b>
+          </div>
+          <div class="holding">
+            <span>待领分红</span>
+            <b id="coFounderPending">—</b>
+            <button class="btn btn-mini btn-soft" id="btnClaimCoFounder" type="button" disabled>领取</button>
+          </div>
+        </div>
+
+        <div class="buy-form">
+          <label class="field">
+            <span>推荐人地址（可选）</span>
+            <input id="referrerCoFounder" type="text" placeholder="0x… 留空则推荐份额进入运营金库" autocomplete="off" spellcheck="false" />
+          </label>
+          <button class="btn btn-primary btn-block" id="btnBuyCoFounder" type="button" style="margin-top:12px">
+            <span class="btn-label">购买联创节点</span>
+            <span class="btn-amount" id="coFounderPay">—</span>
+          </button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-rule reveal">
+      <span class="idx">01</span>
+      <span class="line"></span>
+      <span class="eyebrow">分红池状态</span>
+    </div>
+
+    <div class="section-head reveal">
+      <div><h2>两个均分池</h2></div>
+      <p>分红以 SLG 结算，每笔利息发放时同步入池。持仓与待领金额随时可查，领取无排队。</p>
+    </div>
+
+    <div class="node-grid">
+      <article class="card card-flat reveal">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">FOUNDING POOL</span>
+            <h3 class="card-title">创始分红池</h3>
+          </div>
+          <span class="tag" id="fdState">—</span>
+        </div>
+        <div class="data-list">
+          <div class="data-row"><span>席位占用</span><b id="fdNodes">—</b></div>
+          <div class="data-row"><span>容量</span><b id="fdCap">—</b></div>
+          <div class="data-row"><span>累计入池 SLG</span><b id="fdDist">—</b></div>
+          <div class="data-row"><span>持有人数</span><b id="fdHolders">—</b></div>
+          <div class="data-row"><span>池内余额</span><b id="fdBalance">—</b></div>
+        </div>
+      </article>
+
+      <article class="card card-flat reveal">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">CO-FOUNDER POOL</span>
+            <h3 class="card-title">联创分红池</h3>
+          </div>
+          <span class="tag" id="cdState">—</span>
+        </div>
+        <div class="data-list">
+          <div class="data-row"><span>席位占用</span><b id="cdNodes">—</b></div>
+          <div class="data-row"><span>容量</span><b id="cdCap">—</b></div>
+          <div class="data-row"><span>累计入池 SLG</span><b id="cdDist">—</b></div>
+          <div class="data-row"><span>持有人数</span><b id="cdHolders">—</b></div>
+          <div class="data-row"><span>池内余额</span><b id="cdBalance">—</b></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-rule reveal">
+      <span class="idx">02</span>
+      <span class="line"></span>
+      <span class="eyebrow">发售规则</span>
+    </div>
+
+    <div class="flow-grid">
+      <article class="card flow-card reveal">
+        <span class="flow-index">SPLIT</span>
+        <h3>款项拆分</h3>
+        <p class="flow-lead">一次支付，链上立即完成三段分配。</p>
+        <div class="flow-bars">
+          <div class="flow-bar"><span class="flow-fill f1" style="--w:10%"></span><span class="flow-tag">推荐人 10%</span></div>
+          <div class="flow-bar"><span class="flow-fill f2" style="--w:10%"></span><span class="flow-tag">运营金库 10%</span></div>
+          <div class="flow-bar"><span class="flow-fill f3" style="--w:80%"></span><span class="flow-tag">买入 SLG → 收益储备 80%</span></div>
+        </div>
+      </article>
+
+      <article class="card flow-card reveal">
+        <span class="flow-index">DIVIDEND</span>
+        <h3>分红结算</h3>
+        <p class="flow-lead">按席位均分，随利息实时累积。</p>
+        <ul class="rule-list">
+          <li>每笔利息的 10% 进入对应分红池</li>
+          <li>池子按席位数量等额分配，无锁仓</li>
+          <li>领取只转移已累计部分，不影响席位</li>
+          <li>席位归属可在异常情况下由管理端恢复</li>
+        </ul>
+      </article>
+
+      <article class="card flow-card reveal">
+        <span class="flow-index">LIMITS</span>
+        <h3>边界条件</h3>
+        <p class="flow-lead">以下规则由合约强制，不依赖人工。</p>
+        <ul class="rule-list">
+          <li>支付金额必须与当前单价完全一致</li>
+          <li>同类席位售完后交易直接回滚</li>
+          <li>推荐人不能是购买者本人</li>
+          <li>无推荐人时，推荐份额转入运营金库</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="brand-text">SLG<em>PROTOCOL</em></span>
+      <p>节点 · 质押 · 分红 一体化协议</p>
+    </div>
+    <div class="footer-meta">
+      <span>Network <b>BSC Mainnet · 56</b></span>
+      <span>Build <b id="footerVersion">v4.0</b></span>
+      <span>Source <b>实时链上读取</b></span>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>© 2026 SLG Protocol. 加密资产价格波动剧烈，参与前请独立评估风险。</span>
+    <span>本页面仅为合约交互界面，不构成任何投资建议。</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+<script src="assets/js/ethers.umd.min.js"></script>
+<script src="assets/js/config.js?v=16"></script>
+<script src="assets/js/app.js?v=20"></script>
+</body>
+</html>
