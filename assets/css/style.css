@@ -1964,3 +1964,53 @@ html:not(.no-js) .reveal.in { opacity: 1; transform: none; }
   html { scroll-behavior: auto; }
   html:not(.no-js) .reveal { opacity: 1; transform: none; }
 }
+
+/* one-click buy */
+.seg {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.seg-btn.is-active {
+  background: var(--jade);
+  color: #0a0d0a;
+  font-weight: 600;
+}
+.slip-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.slip-btn:hover { border-color: rgba(201, 245, 106, 0.3); }
+.slip-btn.is-on {
+  border-color: rgba(201, 245, 106, 0.45);
+  background: rgba(201, 245, 106, 0.14);
+  color: var(--jade);
+}
+
+#buy { scroll-margin-top: 96px; }
+
