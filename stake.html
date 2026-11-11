@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="no-js">
 <head>
 <meta charset="UTF-8" />
@@ -29,7 +29,7 @@
     <nav class="nav">
       <a href="index.html">总览</a>
       <a href="nodes.html">节点</a>
-      <a href="stake.html#buy">买入</a>
+      <a href="stake.html#buy">回购</a>
       <a href="stake.html" class="is-active">质押</a>
       <a href="levels.html">等级</a>
     </nav>
@@ -73,58 +73,36 @@
     <div class="board reveal">
       <div class="board-top">
         <div class="stake-status">
-          <span class="eyebrow">ONE-CLICK BUY · PANCAKE</span>
+          <span class="eyebrow">PROTOCOL BUYBACK · WBNB</span>
           <div class="stake-status-text">
-            <h3>一键买入 SLG</h3>
+            <h3>合约回购 SLG</h3>
           </div>
-          <span class="tag live" id="buyRouteTag">WBNB / SLG</span>
+          <span class="tag live" id="bbStateTag">—</span>
         </div>
       </div>
 
       <div class="board-body">
         <div class="board-col">
           <div class="col-head">
-            <span class="eyebrow">SWAP</span>
-            <h2>用 BNB 或 WBNB 买入</h2>
+            <span class="eyebrow">TRIGGER</span>
+            <h2>触发池内 WBNB 买入</h2>
           </div>
 
           <div class="stake-form">
-            <div class="seg" id="buyMode">
-              <button class="seg-btn is-active" type="button" data-mode="bnb">BNB</button>
-              <button class="seg-btn" type="button" data-mode="wbnb">WBNB</button>
-            </div>
-
-            <label class="field">
-              <span class="field-label">
-                <span>支付数量</span>
-                <span class="field-hint-inline" id="buyBalanceHint">—</span>
-              </span>
-              <div class="input-wrap">
-                <input id="buyAmount" type="text" inputmode="decimal" placeholder="0.0" autocomplete="off" spellcheck="false" />
-                <span class="unit" id="buyUnit">BNB</span>
-              </div>
-              <span class="field-hint" id="buyHint">输入数量后自动报价</span>
-            </label>
-
-            <div class="quick-row">
-              <button class="btn btn-mini btn-soft" type="button" data-pct="25">25%</button>
-              <button class="btn btn-mini btn-soft" type="button" data-pct="50">50%</button>
-              <button class="btn btn-mini btn-soft" type="button" data-pct="100">MAX</button>
-              <span class="field-hint-inline" style="margin-left:auto">滑点</span>
-              <button class="slip-btn" type="button" data-slip="500">5%</button>
-              <button class="slip-btn is-on" type="button" data-slip="1000">10%</button>
-              <button class="slip-btn" type="button" data-slip="1500">15%</button>
-            </div>
-
             <div class="stat-rows">
-              <div class="stat-row"><span>预计报价</span><b id="buyQuoteSlg">—</b></div>
-              <div class="stat-row"><span>最低到账（滑点后）</span><b id="buyMinOut">—</b></div>
-              <div class="stat-row"><span>价格冲击</span><b id="buyImpact">—</b></div>
-              <div class="stat-row"><span>支付价值</span><b id="buyPayUsd">—</b></div>
-              <div class="stat-row"><span>参考汇率</span><b id="buyRate">—</b></div>
+              <div class="stat-row"><span>池内 WBNB 余额</span><b id="bbPoolWbnb">—</b></div>
+              <div class="stat-row"><span>节点合约 WBNB</span><b id="bbNodeWbnb">—</b></div>
+              <div class="stat-row"><span>预计换得 SLG</span><b id="bbQuoteSlg">—</b></div>
+              <div class="stat-row"><span>合约最低保护</span><b id="bbFloor">—</b></div>
+              <div class="stat-row"><span>回购后收益储备</span><b id="bbReserveAfter">—</b></div>
             </div>
 
-            <button class="btn btn-primary btn-block" id="btnBuySlg" type="button" style="margin-top:14px">一键买入 SLG</button>
+            <span class="field-hint" id="bbHint">读取池内 WBNB 余额中…</span>
+
+            <button class="btn btn-primary btn-block" id="btnBuyback" type="button" style="margin-top:6px" disabled>
+              触发回购（合约 WBNB）
+            </button>
+            <button class="btn btn-soft btn-block" id="btnBuybackRefresh" type="button">刷新池内余额</button>
           </div>
         </div>
 
@@ -132,19 +110,20 @@
 
         <div class="board-col">
           <div class="col-head">
-            <span class="eyebrow">BALANCE</span>
-            <h2>我的余额</h2>
+            <span class="eyebrow">RESERVE</span>
+            <h2>回购与储备</h2>
           </div>
 
           <div class="stat-rows">
-            <div class="stat-row"><span>钱包 BNB</span><b id="buyBnbBal">—</b></div>
-            <div class="stat-row"><span>钱包 WBNB</span><b id="buyWbnbBal">—</b></div>
-            <div class="stat-row"><span>钱包 SLG</span><b id="buySlgBal">—</b></div>
+            <div class="stat-row"><span>当前收益储备</span><b id="bbReserve">—</b></div>
+            <div class="stat-row"><span>累计回购 SLG</span><b id="bbTotal">—</b></div>
+            <div class="stat-row"><span>合约保护阈值</span><b id="bbTolerance">—</b></div>
+            <div class="stat-row"><span>回购合约</span><b id="bbPoolAddr" class="mono">—</b></div>
           </div>
 
           <div class="notice">
             <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
-            <span>通过 PancakeSwap 直接兑换，SLG 即时进入钱包。最低到账按滑点保护计算，实际到账会扣除 SLG 转账税。</span>
+            <span>回购使用质押池自身的 WBNB 余额，通过 PancakeSwap 换成 SLG 并全部计入收益储备。任何人都可以触发，成交价由合约按 <b>报价 × (1 − 保护阈值)</b> 兜底，无需授权、不花用户资金。</span>
           </div>
         </div>
       </div>
@@ -312,7 +291,7 @@
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
 
 <script src="assets/js/ethers.umd.min.js"></script>
-<script src="assets/js/config.js?v=17"></script>
-<script src="assets/js/app.js?v=21"></script>
+<script src="assets/js/config.js?v=18"></script>
+<script src="assets/js/app.js?v=24"></script>
 </body>
 </html>

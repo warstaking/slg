@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="no-js">
 <head>
 <meta charset="UTF-8" />
@@ -29,6 +29,7 @@
     <nav class="nav">
       <a href="index.html" class="is-active">总览</a>
       <a href="nodes.html">节点</a>
+      <a href="stake.html#buy">回购</a>
       <a href="stake.html">质押</a>
       <a href="levels.html">等级</a>
     </nav>
@@ -116,6 +117,40 @@
     </a>
   </section>
 
+  <section class="wrap section tight">
+    <article class="card reveal" id="bb">
+      <div class="head-actions" style="justify-content:space-between">
+        <div>
+          <span class="eyebrow">PROTOCOL BUYBACK · WBNB</span>
+          <h3 class="card-title">触发合约回购 SLG</h3>
+        </div>
+        <span class="tag" id="bbStateTag">—</span>
+      </div>
+
+      <div class="stat-grid" style="margin-top:18px">
+        <div class="acct"><span>池内 WBNB</span><b id="bbPoolWbnb">—</b></div>
+        <div class="acct"><span>节点合约 WBNB</span><b id="bbNodeWbnb">—</b></div>
+        <div class="acct"><span>预计换得 SLG</span><b id="bbQuoteSlg">—</b></div>
+        <div class="acct"><span>合约最低保护</span><b id="bbFloor">—</b></div>
+        <div class="acct"><span>当前收益储备</span><b id="bbReserve">—</b></div>
+        <div class="acct"><span>累计回购 SLG</span><b id="bbTotal">—</b></div>
+        <div class="acct"><span>保护阈值</span><b id="bbTolerance">—</b></div>
+      </div>
+
+      <p class="micro-note" id="bbHint" style="margin-top:14px">读取池内 WBNB 余额中…</p>
+
+      <div class="act-pair" style="margin-top:16px">
+        <button class="btn btn-primary" id="btnBuyback" type="button" disabled>触发回购（合约 WBNB）</button>
+        <button class="btn btn-soft" id="btnBuybackRefresh" type="button">刷新</button>
+      </div>
+
+      <p class="micro-note" style="margin-top:12px">
+        任何人都可以触发。合约会把质押池自身的 WBNB 全部换成 SLG 并计入收益储备，触发者只消耗 gas，不动用任何用户资金。回购合约
+        <b id="bbPoolAddr" class="mono">—</b>
+      </p>
+    </article>
+  </section>
+
 </main>
 
 <footer class="footer">
@@ -139,7 +174,7 @@
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
 
 <script src="assets/js/ethers.umd.min.js"></script>
-<script src="assets/js/config.js?v=16"></script>
-<script src="assets/js/app.js?v=20"></script>
+<script src="assets/js/config.js?v=18"></script>
+<script src="assets/js/app.js?v=24"></script>
 </body>
 </html>
