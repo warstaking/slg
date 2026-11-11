@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="no-js">
 <head>
 <meta charset="UTF-8" />
@@ -74,6 +74,20 @@
         </div>
         <button class="btn btn-outline btn-block" id="btnWithdrawReserve" type="button" data-action>提取储备</button>
         <p class="micro-note">上限为 yieldReserveSLG，提取后池子仍满足 余额 ≥ 本金 + 储备。</p>
+      </article>
+
+      <article class="card">
+        <span class="eyebrow">BUYBACK</span>
+        <h3 class="card-title">触发池内 WBNB 回购</h3>
+        <div class="data-list">
+          <div class="data-row"><span>质押池 WBNB</span><b id="adminBbWbnb">—</b></div>
+          <div class="data-row"><span>节点合约 WBNB</span><b id="adminBbNodeWbnb">—</b></div>
+          <div class="data-row"><span>预计换得 SLG</span><b id="adminBbQuote">—</b></div>
+          <div class="data-row"><span>收益储备</span><b id="adminBbReserve">—</b></div>
+        </div>
+        <button class="btn btn-outline btn-block" id="btnBuybackAdmin" type="button" data-action>触发回购</button>
+        <button class="btn btn-soft btn-block" id="btnSweepNodeWbnb" type="button" data-action>归集节点合约 WBNB 到质押池</button>
+        <p class="micro-note">回购调用 StakingPool.buybackWbnb(0)，只动用质押池自身的 WBNB。节点合约内误转的 WBNB 需先归集（rescueToken → 质押池）才能参与回购。</p>
       </article>
 
       <article class="card">
@@ -160,7 +174,7 @@
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
 
 <script src="ethers.umd.min.js"></script>
-<script src="config.js?v=16"></script>
-<script src="admin.js?v=15"></script>
+<script src="config.js?v=18"></script>
+<script src="admin.js?v=17"></script>
 </body>
 </html>

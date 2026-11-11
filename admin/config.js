@@ -28,6 +28,7 @@ window.SLG_CONFIG = {
   },
   pancake: {
     factory: "0xca143ce32fe78f1f7019d7d551a6402fc5350c73",
+    router: "0x10ed43c718714eb63d5aa57b78b54704e256024e",
     wbnb: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
     bniPair: "0x04daaa7088ee209101f33198f2da86c05b539121",
     slgPair: "0x831ad208f9b17afe61945f854026522567ae39fa"
@@ -55,6 +56,10 @@ window.SLG_ABI = {
   pancakePair: [
     "function token0() view returns (address)",
     "function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)"
+  ],
+
+  pancakeRouter: [
+    "function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[] amounts)"
   ],
 
   nodeProgram: [
@@ -120,6 +125,9 @@ window.SLG_ABI = {
     "function totalRewardUSD() view returns (uint256)",
     "function totalDepositUSD() view returns (uint256)",
     "function totalDistributionUSD() view returns (uint256)",
+    "function totalBuybackSLG() view returns (uint256)",
+    "function buybackWbnb(uint256 minOut) returns (uint256 receivedSLG)",
+    "function wbnb() view returns (address)",
     "function memberVolumeUSD(address user) view returns (uint256)",
     "function isSolvent() view returns (bool)",
     "function unpaidRewardUSD(address user) view returns (uint256)",

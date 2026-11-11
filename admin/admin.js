@@ -1750,6 +1750,66 @@ const GATE_HTML =
     }
   }
 
+  async function loadBuybackAdmin() {
+    if (PAGE !== "funds" || !state.readProvider) return;
+    const pool = readContract("pool");
+    const wbnb = new U.Contract(CFG.pancake.wbnb, window.SLG_ABI.erc20, state.readProvider);
+    try {
+      const [bal, nodeBal, reserve] = await Promise.all([
+        wbnb.balanceOf(CFG.addresses.stakingPool),
+        wbnb.balanceOf(CFG.addresses.nodeProgram),
+        pool.yieldReserveSLG()
+      ]);
+      let quote = 0n;
+      if (bal > 0n && CFG.pancake.router) {
+        const router = new U.Contract(CFG.pancake.router, window.SLG_ABI.pancakeRouter, state.readProvider);
+        const amounts = await router.getAmountsOut(bal, [CFG.pancake.wbnb, CFG.token.slg]);
+        quote = amounts[amounts.length - 1];
+      }
+      setText("adminBbWbnb", U.formatUnits(bal, 18) + " WBNB");
+      setText("adminBbNodeWbnb", U.formatUnits(nodeBal, 18) + " WBNB");
+      setText("adminBbQuote", quote > 0n ? slgText(quote) : "—");
+      setText("adminBbReserve", slgText(reserve));
+      const btn = $("btnBuybackAdmin");
+      if (btn) btn.disabled = bal <= 0n;
+      const sweep = $("btnSweepNodeWbnb");
+      if (sweep) sweep.disabled = nodeBal <= 0n;
+    } catch {
+      setText("adminBbWbnb", "—");
+      setText("adminBbNodeWbnb", "—");
+      setText("adminBbQuote", "—");
+      setText("adminBbReserve", "—");
+    }
+  }
+
+  async function actBuyback() {
+    if (!requireOwner("pool")) return;
+    const c = writeContract("pool");
+    await send("pool", "触发回购", (opts) => c.buybackWbnb(0, opts), 600000n);
+    await loadBuybackAdmin();
+  }
+
+  async function actSweepNodeWbnb() {
+    if (!requireOwner("node")) return;
+    const wbnb = new U.Contract(CFG.pancake.wbnb, window.SLG_ABI.erc20, state.readProvider);
+    let bal = 0n;
+    try {
+      bal = await wbnb.balanceOf(CFG.addresses.nodeProgram);
+    } catch {
+      return fail("读取节点合约 WBNB 余额失败");
+    }
+    if (bal <= 0n) return fail("节点合约内没有 WBNB");
+    if (!window.confirm("将节点合约内的 " + U.formatUnits(bal, 18) + " WBNB 转入质押池，确认执行？")) return;
+    const c = writeContract("node");
+    await send(
+      "node",
+      "归集 WBNB",
+      (opts) => c.rescueToken(CFG.pancake.wbnb, CFG.addresses.stakingPool, bal, opts),
+      300000n
+    );
+    await loadBuybackAdmin();
+  }
+
   async function refreshAll(force) {
     if (state.refreshing) {
       await state.refreshing.catch(() => {});
@@ -1759,6 +1819,7 @@ const GATE_HTML =
       await loadOwners();
       renderAccess();
       await loadMonitor();
+      await loadBuybackAdmin();
     })();
     try {
       await state.refreshing;
@@ -1826,6 +1887,8 @@ const GATE_HTML =
     on("btnVaultUnpause", () => actVaultPause(false));
 
     on("btnWithdrawReserve", actWithdrawReserve);
+    on("btnBuybackAdmin", actBuyback);
+    on("btnSweepNodeWbnb", actSweepNodeWbnb);
     on("btnMigrate", actMigrate);
     on("btnRescueToken", actRescueToken);
     on("btnRescueEth", actRescueEth);
