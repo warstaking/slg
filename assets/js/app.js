@@ -30,7 +30,8 @@
     syncingUsd: false,
     matureKey: null,
     statsFailed: false,
-    refreshing: null
+    refreshing: null,
+    buy: { mode: "bnb", slipBps: 1000, quote: null, seq: 0, timer: null }
   };
 
   if (!U) {
@@ -347,6 +348,10 @@
       return "钱包拒绝了这笔交易（未弹出确认页）。请更新钱包 App、确认已切到 BSC 主网，或在 MetaMask 桌面端重试。";
     }
     if (/CALL_EXCEPTION/i.test(msg)) return "合约调用失败，请稍后重试";
+    if (/TRANSFER_FROM_FAILED/i.test(msg)) return "WBNB 授权或余额不足，无法完成兑换";
+    if (/INSUFFICIENT_OUTPUT_AMOUNT/i.test(msg)) return "滑点超出限制：价格波动过大，请提高滑点后重试";
+    if (/EXPIRED/i.test(msg)) return "交易已过期，请重新提交";
+    if (/^Error$/i.test(msg.trim())) return "交易模拟失败，请稍后重试或提高滑点";
     if (/timeout|network|fetch/i.test(msg)) return "网络请求失败，请检查 RPC 连接";
     return truncate(msg.replace(/^execution reverted:?\s*/i, ""), 90, 20);
   }
@@ -853,6 +858,7 @@
     const cd = readContract("coFounderDividend", "nodeDividend", store.browserProvider);
     const slg = new U.Contract(CFG.token.slg, ABI.erc20, store.browserProvider);
     const bni = new U.Contract(CFG.token.bni, ABI.erc20, store.browserProvider);
+    const wbnb = new U.Contract(CFG.pancake.wbnb, ABI.erc20, store.browserProvider);
     const acc = store.account;
 
     const r = await runLimited(
@@ -878,7 +884,8 @@
         () => node.coFounderNodes(acc),
         () => store.browserProvider.getBalance(acc),
         () => pool.unpaidRewardUSD(acc),
-        () => pool.isActiveStaker(acc)
+        () => pool.isActiveStaker(acc),
+        () => wbnb.balanceOf(acc)
       ],
       6
     );
@@ -888,7 +895,7 @@
       lifetime, ceiling, teamVolume, referrer, hasStaked,
       slgBalance, allowance, bniBalance,
       foundingPending, coPending, foundingNodes, coNodes, bnbBalance,
-      deferredUSD, activeStaker
+      deferredUSD, activeStaker, wbnbBalance
     ] = r;
 
     store.order = orderRaw
@@ -928,7 +935,8 @@
       foundingNodes: num(foundingNodes) || 0,
       coNodes: num(coNodes) || 0,
       deferredUSD: deferredUSD || 0n,
-      activeStaker: activeStaker === null ? null : !!activeStaker
+      activeStaker: activeStaker === null ? null : !!activeStaker,
+      wbnbBalance: wbnbBalance || 0n
     };
 
     renderAccount();
@@ -979,6 +987,7 @@
     if (PAGE === "stake") renderStake();
     if (PAGE === "levels") renderLevels();
     updateDerived();
+    renderBuy();
   }
 
 
@@ -1254,6 +1263,7 @@
     }
 
     renderRound();
+    renderBuy();
   }
   function renderRound() {
     const order = store.order;
@@ -1385,7 +1395,7 @@
     store.busy = on;
     document
       .querySelectorAll(
-        "#btnStake, #btnExit, #btnBuyFounding, #btnBuyCoFounder, #btnClaimFounding, #btnClaimCoFounder, #btnClaimDeferred"
+        "#btnStake, #btnExit, #btnBuyFounding, #btnBuyCoFounder, #btnClaimFounding, #btnClaimCoFounder, #btnClaimDeferred, #btnBuySlg"
       )
       .forEach((btn) => {
         if (on) btn.disabled = true;
@@ -1779,6 +1789,254 @@
   }
 
 
+  function pancakeRouter(runner) {
+    if (!CFG.pancake || !CFG.pancake.router) return null;
+    return new U.Contract(CFG.pancake.router, ABI.pancakeRouter, runner || store.readProvider);
+  }
+
+  function buyAmountWei() {
+    const el = $("buyAmount");
+    if (!el) return null;
+    const raw = el.value.trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    try {
+      const wei = U.parseUnits(raw, 18);
+      return wei > 0n ? wei : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function buyBalanceOf() {
+    if (!store.user) return 0n;
+    return store.buy.mode === "wbnb" ? store.user.wbnbBalance : store.user.bnbBalance;
+  }
+
+  async function quoteBuy() {
+    const quote = { quoted: null, minOut: null, impact: null, usdIn: null, error: null };
+    store.buy.quote = quote;
+    const seq = ++store.buy.seq;
+    const amount = buyAmountWei();
+    const router = pancakeRouter(store.readProvider);
+    if (!amount || !router) {
+      renderBuyQuote();
+      return;
+    }
+    try {
+      const amounts = await router.getAmountsOut(amount, [CFG.pancake.wbnb, CFG.token.slg]);
+      if (seq !== store.buy.seq) return;
+      const quoted = amounts[1];
+      quote.quoted = quoted;
+      quote.minOut = (quoted * BigInt(10000 - store.buy.slipBps)) / 10000n;
+      const p = store.prices;
+      if (p.slg && p.bnb) {
+        const usdIn = (amount * p.bnb) / PRICE_UNIT;
+        const usdOut = (quoted * p.slg) / PRICE_UNIT;
+        quote.usdIn = usdIn;
+        if (usdIn > 0n) {
+          const diff = usdIn > usdOut ? usdIn - usdOut : 0n;
+          quote.impact = (Number(diff) / Number(usdIn)) * 100;
+        }
+      }
+    } catch (err) {
+      if (seq !== store.buy.seq) return;
+      quote.error = err;
+    }
+    renderBuyQuote();
+  }
+
+  function renderBuyQuote() {
+    const q = store.buy.quote || {};
+    const slgDec = store.decimals.slg;
+    setText("buyQuoteSlg", q.quoted ? fmtUnits(q.quoted, slgDec, 2) + " SLG" : "—");
+    setText("buyMinOut", q.minOut ? fmtUnits(q.minOut, slgDec, 2) + " SLG" : "—");
+    setText("buyImpact", q.impact === null || q.impact === undefined ? "—" : q.impact.toFixed(2) + "%");
+    setText("buyPayUsd", q.usdIn ? usd(q.usdIn) : "—");
+    setText(
+      "buyRate",
+      q.quoted && q.usdIn
+        ? "1 SLG ≈ " + tokenPriceText()
+        : "—"
+    );
+    const hint = $("buyHint");
+    if (hint) {
+      if (q.error) hint.textContent = "报价失败，请稍后重试或刷新页面";
+      else if (!buyAmountWei()) hint.textContent = "输入数量后自动报价";
+      else hint.textContent = "报价含池内价格冲击，未扣 SLG 转账税";
+    }
+  }
+
+  function renderBuy() {
+    const btn = $("btnBuySlg");
+    if (!btn) return;
+
+    const mode = store.buy.mode;
+    document.querySelectorAll("#buyMode .seg-btn").forEach((el) => {
+      el.classList.toggle("is-active", el.dataset.mode === mode);
+    });
+    document.querySelectorAll("[data-slip]").forEach((el) => {
+      el.classList.toggle("is-on", Number(el.dataset.slip) === store.buy.slipBps);
+    });
+
+    setText("buyUnit", mode === "wbnb" ? "WBNB" : "BNB");
+    setText(
+      "buyBalanceHint",
+      store.account && store.user
+        ? "可用 " + fmtUnits(buyBalanceOf(), 18, 4) + " " + (mode === "wbnb" ? "WBNB" : "BNB")
+        : "连接钱包后可查看余额"
+    );
+
+    setText("buyBnbBal", store.account && store.user ? fmtUnits(store.user.bnbBalance, 18, 4) + " BNB" : "—");
+    setText("buyWbnbBal", store.account && store.user ? fmtUnits(store.user.wbnbBalance, 18, 4) + " WBNB" : "—");
+    setText(
+      "buySlgBal",
+      store.account && store.user ? fmtUnits(store.user.slgBalance, store.decimals.slg, 2) + " SLG" : "—"
+    );
+
+    const input = $("buyAmount");
+    if (input) input.disabled = store.busy;
+
+    btn.disabled = store.busy || !CFG.pancake || !CFG.pancake.router;
+    btn.textContent = "一键买入 SLG";
+
+    renderBuyQuote();
+  }
+
+  function scheduleBuyQuote() {
+    if (store.buy.timer) window.clearTimeout(store.buy.timer);
+    store.buy.timer = window.setTimeout(() => {
+      store.buy.timer = null;
+      quoteBuy();
+    }, 260);
+  }
+
+  async function doBuySlg() {
+    if (store.busy) return;
+    if (!CFG.pancake || !CFG.pancake.router) {
+      toast("error", "未配置路由", "缺少 PancakeSwap 路由地址，暂时无法买入。");
+      return;
+    }
+    if (!(await ensureWallet())) return;
+    if (!store.user) await loadAccount();
+
+    const amount = buyAmountWei();
+    if (!amount) {
+      toast("warn", "请输入数量", "填写要支付的 " + (store.buy.mode === "wbnb" ? "WBNB" : "BNB") + " 数量后再买入。");
+      return;
+    }
+
+    const mode = store.buy.mode;
+    const path = [CFG.pancake.wbnb, CFG.token.slg];
+    const routerAddr = CFG.pancake.router;
+
+    setBusy(true);
+    try {
+      await assertChain();
+      const router = pancakeRouter(store.readProvider);
+      if (!router) throw new Error("路由未配置");
+
+      let quoted;
+      try {
+        quoted = (await router.getAmountsOut(amount, path))[1];
+      } catch {
+        throw new Error("报价失败，请稍后重试");
+      }
+      if (!quoted || quoted === 0n) throw new Error("报价为 0，请调整数量");
+
+      const minOut = (quoted * BigInt(10000 - store.buy.slipBps)) / 10000n;
+      const deadline = Math.floor(Date.now() / 1000) + 1200;
+      const value = mode === "bnb" ? amount : 0n;
+      const data =
+        mode === "bnb"
+          ? encodeCall("pancakeRouter", "swapExactETHForTokensSupportingFeeOnTransferTokens", [
+              minOut, path, store.account, deadline
+            ])
+          : encodeCall("pancakeRouter", "swapExactTokensForTokensSupportingFeeOnTransferTokens", [
+              amount, minOut, path, store.account, deadline
+            ]);
+
+      if (mode === "wbnb" && store.user && store.user.wbnbBalance < amount) {
+        toast(
+          "warn",
+          "WBNB 余额不足",
+          "钱包持有 " + fmtUnits(store.user.wbnbBalance, 18, 4) + " WBNB，本次需要 " +
+            fmtUnits(amount, 18, 4) + " WBNB。",
+          9000
+        );
+        return;
+      }
+
+      const fee = await estimateNetworkFee({ to: routerAddr, value, data });
+      if (store.user && fee !== null) {
+        if (mode === "bnb" && store.user.bnbBalance < amount + fee) {
+          toast(
+            "error",
+            "BNB 余额不足以支付网络费",
+            "本次需要 " + bnbBalanceText(amount) + " + 约 " + bnbBalanceText(fee) +
+              " 网络费，钱包当前 " + bnbBalanceText(store.user.bnbBalance) + "。",
+            12000
+          );
+          return;
+        }
+        if (mode === "wbnb" && store.user.bnbBalance < fee) {
+          toast(
+            "error",
+            "BNB 不足以支付网络费",
+            "买入 WBNB 仍需要约 " + bnbBalanceText(fee) + " 的 BNB 作为 gas，钱包当前 " +
+              bnbBalanceText(store.user.bnbBalance) + "。",
+            12000
+          );
+          return;
+        }
+      }
+
+      if (mode === "wbnb") {
+        const wbnb = new U.Contract(CFG.pancake.wbnb, ABI.erc20, store.readProvider);
+        let allowance = 0n;
+        try {
+          allowance = await wbnb.allowance(store.account, routerAddr);
+        } catch {
+          allowance = 0n;
+        }
+        if (allowance < amount) {
+          toast("info", "需要授权 WBNB", "请在钱包中确认授权，随后继续提交买入。", 6000);
+          const approveTx = await walletSend({
+            to: CFG.pancake.wbnb,
+            data: encodeCall("erc20", "approve", [routerAddr, MAX_UINT])
+          });
+          toast("info", "授权已提交", maskHash(approveTx.hash), 6000);
+          checkReceipt(await approveTx.wait());
+        }
+      }
+
+      const ok = await preflight("买入 SLG", () =>
+        store.readProvider.call({ from: store.account, to: routerAddr, value, data })
+      );
+      if (!ok) return;
+
+      const tx = await walletSend({ to: routerAddr, value, data });
+      toast("info", "买入已提交", maskHash(tx.hash), 6000);
+      checkReceipt(await tx.wait());
+      toast(
+        "success",
+        "买入成功",
+        "SLG 已转入钱包（实际到账扣除代币转账税）。最低到账 " + fmtUnits(minOut, store.decimals.slg, 2) + " SLG。",
+        9000
+      );
+      const input = $("buyAmount");
+      if (input) input.value = "";
+    } catch (err) {
+      toast("error", "买入失败", errorText(err), 9000);
+    } finally {
+      setBusy(false);
+      await refreshAll(true);
+      renderBuy();
+    }
+  }
+
+
   function tick() {
     if (PAGE !== "stake") return;
     if (!store.order || !store.order.active) return;
@@ -1817,6 +2075,51 @@
     on("btnClaimFounding", () => claimDividend("founding"));
     on("btnClaimCoFounder", () => claimDividend("cofounder"));
     on("btnClaimDeferred", claimDeferred);
+    on("btnBuySlg", doBuySlg);
+
+    document.querySelectorAll("#buyMode .seg-btn").forEach((el) => {
+      el.addEventListener("click", () => {
+        if (store.busy) return;
+        const mode = el.dataset.mode === "wbnb" ? "wbnb" : "bnb";
+        if (mode === store.buy.mode) return;
+        store.buy.mode = mode;
+        renderBuy();
+        scheduleBuyQuote();
+      });
+    });
+
+    document.querySelectorAll("[data-pct]").forEach((el) => {
+      el.addEventListener("click", () => {
+        if (store.busy) return;
+        if (!store.account) {
+          toast("info", "请先连接钱包", "连接后可读取余额。");
+          return;
+        }
+        const pct = Number(el.dataset.pct) || 0;
+        const bal = buyBalanceOf();
+        let amount = (bal * BigInt(pct)) / 100n;
+        if (store.buy.mode === "bnb" && pct >= 100) {
+          const reserve = 3_000_000_000_000_000n;
+          amount = bal > reserve ? bal - reserve : 0n;
+        }
+        const input = $("buyAmount");
+        if (input) input.value = amount > 0n ? rawUnits(amount, 18) : "";
+        scheduleBuyQuote();
+      });
+    });
+
+    document.querySelectorAll("[data-slip]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const slip = Number(el.dataset.slip);
+        if (!Number.isFinite(slip) || slip <= 0) return;
+        store.buy.slipBps = slip;
+        renderBuy();
+        scheduleBuyQuote();
+      });
+    });
+
+    const buyInput = $("buyAmount");
+    if (buyInput) buyInput.addEventListener("input", scheduleBuyQuote);
 
     const refreshBtn = $("btnRefresh");
     if (refreshBtn) {
