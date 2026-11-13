@@ -1,4 +1,4 @@
-
+﻿
 (function () {
   "use strict";
 
@@ -126,7 +126,7 @@ const GATE_HTML =
     readProvider: null,
     owners: null,
     can: {},
-    decimals: { slg: 18, bni: 18 },
+    decimals: { slg: 0, bni: 18 },
     prices: { slg: null, bnb: null, bni: null },
     pool: null,
     node: null,
@@ -645,7 +645,7 @@ const GATE_HTML =
     // SLG.decimals() is 0 on-chain while the pool and PriceHub price
     // 18-decimal units. Use the configured unit instead of decimals().
     const cfgSlg = Number(CFG.token && CFG.token.slgDecimals);
-    state.decimals.slg = Number.isFinite(cfgSlg) && cfgSlg >= 0 ? cfgSlg : 18;
+    state.decimals.slg = Number.isFinite(cfgSlg) && cfgSlg >= 0 ? cfgSlg : 0;
     const cfgBni = Number(CFG.token && CFG.token.bniDecimals);
     state.decimals.bni = Number.isFinite(cfgBni) && cfgBni >= 0 ? cfgBni : 18;
     state.prices = { slg: slgPrice || null, bnb: bnbPrice || null, bni: null };
@@ -1742,7 +1742,7 @@ const GATE_HTML =
         hub.usdToSLG(BigInt(raw))
       ]);
       setText("oracleToUsd", toUsd === null ? "—" : usd(toUsd));
-      setText("oracleToSlg", toSlg === null ? "—" : U.formatUnits(toSlg, 18));
+      setText("oracleToSlg", toSlg === null ? "—" : U.formatUnits(toSlg, state.decimals.slg));
     } catch (err) {
       setText("oracleToUsd", "—");
       setText("oracleToSlg", "—");
@@ -1914,7 +1914,7 @@ const GATE_HTML =
         }
         if (kind === "reserve") {
           const input = $("inReserveAmount");
-          if (input && state.pool) input.value = U.formatUnits(state.pool.reserve, 18);
+          if (input && state.pool) input.value = U.formatUnits(state.pool.reserve, state.decimals.slg);
         }
       });
     });
