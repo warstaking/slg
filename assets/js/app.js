@@ -15,7 +15,9 @@
     signer: null,
     account: null,
     chainId: null,
-    decimals: { slg: 18, bni: 18 },
+    rpcUrl: null,
+    publicAt: 0,
+    decimals: { slg: 0, bni: 18 },
     prices: { slg: null, bnb: null, manual: false },
     node: null,
     pool: null,
@@ -24,6 +26,8 @@
     levels: [],
     order: null,
     user: null,
+    accountError: false,
+    paramsCache: null,
     tick: null,
     busy: false,
     autoAmount: "",
@@ -236,6 +240,8 @@
   }
 
   function slgFromUsd(usdWei) {
+    // Oracle quotes to ~1e-8 USD/token; the result is rounded UP so the
+    // staked value never falls below the entered USD amount.
     const price = store.prices.slg;
     if (!price || price <= 0n) return null;
     return (usdWei * PRICE_UNIT + price - 1n) / price;
@@ -390,20 +396,95 @@
   }
 
 
-  function buildReadProvider() {
-    const entries = CFG.rpcUrls.map((url, i) => ({
-      provider: new U.JsonRpcProvider(url, CFG.chainId, { staticNetwork: true }),
-      priority: i + 1,
-      stallTimeout: 2500,
-      weight: 1
-    }));
-    return new U.FallbackProvider(entries, CFG.chainId, { quorum: 1 });
+  // ---- RPC selection -----------------------------------------------------
+  // Waiting for every candidate in the list is what made first paint slow:
+  // Promise.all is gated by the SLOWEST endpoint, so one hanging public node
+  // cost a full 2.5s timeout on every load. Instead we stagger a race and take
+  // the first endpoint that answers, which caps startup at ~one round trip.
+  const PROBE_TIMEOUT = 1200;
+  const PROBE_STAGGER = 120;
+  const BATCH_MAX = 20;
+
+  function makeProvider(url) {
+    return new U.JsonRpcProvider(url, CFG.chainId, {
+      staticNetwork: true,
+      // Collapse the ~50 startup eth_calls into a couple of HTTP requests.
+      // Without this every call is its own round trip.
+      batchMaxCount: BATCH_MAX,
+      batchStallTime: 5
+    });
+  }
+
+  function probeOnce(url) {
+    const started = performance.now();
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] });
+    return Promise.race([
+      fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body })
+        .then((r) => r.json())
+        .then((res) => ({
+          url,
+          ok: !!(res && !res.error && typeof res.result === "string" && /^0x[0-9a-f]+$/.test(res.result)),
+          ms: Math.round(performance.now() - started)
+        }))
+        .catch(() => ({ url, ok: false, ms: 9999 })),
+      new Promise((res) => setTimeout(() => res({ url, ok: false, ms: 9999 }), PROBE_TIMEOUT))
+    ]);
+  }
+
+  // Resolve with the first healthy endpoint, or null when all candidates fail.
+  function raceFirstHealthy(urls) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let pending = urls.length;
+      if (!pending) return resolve(null);
+      urls.forEach((url, i) => {
+        window.setTimeout(() => {
+          if (settled) return;
+          probeOnce(url).then((r) => {
+            if (settled) return;
+            if (r.ok) {
+              settled = true;
+              resolve(r);
+              return;
+            }
+            if (--pending === 0) {
+              settled = true;
+              resolve(null);
+            }
+          });
+        }, i * PROBE_STAGGER);
+      });
+    });
   }
 
   async function pickReadProvider() {
-    const provider = buildReadProvider();
-    await withTimeout(provider.getBlockNumber(), 6000).catch(() => {});
-    return provider;
+    const urls = (CFG.rpcUrls || []).filter(Boolean);
+    if (!urls.length) throw new Error("未配置 RPC 节点");
+    // Probe a short head first so a broken tail entry cannot delay first paint.
+    let hit = await raceFirstHealthy(urls.slice(0, 4));
+    if (!hit) hit = await raceFirstHealthy(urls.slice(4));
+    store.rpcUrl = hit ? hit.url : urls[0];
+    // No extra warm-up round trip here: the probe already proved this endpoint
+    // answers eth_blockNumber, and waiting on getBlockNumber used to add up to
+    // 6s of dead time before the first value rendered.
+    return makeProvider(store.rpcUrl);
+  }
+
+  // Move to the next candidate endpoint after repeated failures.
+  async function rotateReadProvider() {
+    const urls = (CFG.rpcUrls || []).filter(Boolean);
+    if (urls.length < 2) return false;
+    const idx = Math.max(0, urls.indexOf(store.rpcUrl));
+    for (let k = 1; k < urls.length; k++) {
+      const url = urls[(idx + k) % urls.length];
+      const r = await probeOnce(url);
+      if (!r.ok) continue;
+      store.rpcUrl = url;
+      store.readProvider = makeProvider(url);
+      codeChecked.clear();
+      return true;
+    }
+    return false;
   }
 
   function readContract(key, abiKey, runner) {
@@ -608,9 +689,24 @@
   }
 
   function isMobileUA() {
-    return /Android|iPhone|iPad|iPod|HarmonyOS|MiuiBrowser|MicroMessenger|Mobile/i.test(
-      navigator.userAgent || ""
-    );
+    const ua = navigator.userAgent || "";
+    if (/Android|iPhone|iPad|iPod|HarmonyOS|MiuiBrowser|MicroMessenger|Mobile/i.test(ua)) {
+      return true;
+    }
+    // In-app browsers of mobile wallets may report a desktop-like UA; their
+    // injected provider flags are the reliable signal.
+    try {
+      const w = window.ethereum || {};
+      if (
+        w.isTokenPocket || w.isTrust || w.isCoinbaseWallet || w.isImToken ||
+        w.isMathWallet || w.isOKExWallet || w.isOKXWallet || w.isBitkeep ||
+        w.isSafePal || w.isCoin98 || w.isDefiWallet
+      ) {
+        return true;
+      }
+    } catch {
+    }
+    return false;
   }
 
   async function connectWallet() {
@@ -661,6 +757,7 @@
     store.browserProvider = null;
     store.order = null;
     store.user = null;
+    store.accountError = false;
     store.autoAmount = "";
     store.matureKey = null;
     renderWallet();
@@ -678,7 +775,7 @@
     // 18-decimal units. Reading decimals() here would scale every amount and
     // price by 1e18, so the configured unit is authoritative.
     const cfgSlg = Number(CFG.token && CFG.token.slgDecimals);
-    store.decimals.slg = Number.isFinite(cfgSlg) && cfgSlg >= 0 ? cfgSlg : 18;
+    store.decimals.slg = Number.isFinite(cfgSlg) && cfgSlg >= 0 ? cfgSlg : 0;
 
     const cfgBni = Number(CFG.token && CFG.token.bniDecimals);
     store.decimals.bni = Number.isFinite(cfgBni) && cfgBni >= 0 ? cfgBni : 18;
@@ -691,6 +788,49 @@
   }
 
 
+
+  // Immutable or rarely-changed protocol parameters (supplies, capacities,
+  // rate settings, level tables). Re-reading them on every page view is pure
+  // latency, so they are cached for a short TTL and refreshed in the
+  // background. Anything user-specific or balance-like is never cached.
+  const PARAMS_TTL = 10 * 60 * 1000;
+  const PARAMS_KEY = "slg.params.v1";
+
+  function readParamsCache() {
+    try {
+      const raw = window.localStorage.getItem(PARAMS_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj || obj.v !== 12 || !obj.at || Date.now() - obj.at > PARAMS_TTL) return null;
+      return obj.d || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeParamsCache(patch) {
+    try {
+      const raw = window.localStorage.getItem(PARAMS_KEY);
+      const obj = raw ? JSON.parse(raw) : null;
+      const base = obj && obj.v === 12 && obj.d ? obj.d : {};
+      window.localStorage.setItem(
+        PARAMS_KEY,
+        JSON.stringify({ v: 12, at: Date.now(), d: Object.assign(base, patch) })
+      );
+    } catch {
+    }
+  }
+
+  function cachedCall(key, fn) {
+    const c = store.paramsCache;
+    if (c && c[key] !== undefined && c[key] !== null) {
+      try {
+        return () => Promise.resolve(U.toBigInt(c[key]));
+      } catch {
+      }
+    }
+    return fn;
+  }
 
   async function loadPublic() {
     if (!store.readProvider) return;
@@ -714,31 +854,31 @@
           () => pool.totalDepositUSD(),
           () => pool.totalRewardUSD(),
           () => pool.isSolvent(),
-          () => pool.minStakeUSD(),
-          () => pool.maxStakeUSD(),
-          () => pool.dailyRateBps(),
-          () => pool.roundDuration(),
-          () => pool.exitMultiple(),
-          () => pool.bniRateBps(),
-          () => pool.minExitTriggerBNB(),
+          cachedCall("minStake", () => pool.minStakeUSD()),
+          cachedCall("maxStake", () => pool.maxStakeUSD()),
+          cachedCall("dailyRate", () => pool.dailyRateBps()),
+          cachedCall("roundDuration", () => pool.roundDuration()),
+          cachedCall("exitMultiple", () => pool.exitMultiple()),
+          cachedCall("bniRate", () => pool.bniRateBps()),
+          cachedCall("minTrigger", () => pool.minExitTriggerBNB()),
           () => pool.paused(),
 
           () => node.foundingPrice(),
           () => node.coFounderPrice(),
           () => node.foundingSold(),
           () => node.coFounderSold(),
-          () => node.FOUNDING_SUPPLY(),
-          () => node.COFOUNDER_SUPPLY(),
+          cachedCall("foundingSupply", () => node.FOUNDING_SUPPLY()),
+          cachedCall("coFounderSupply", () => node.COFOUNDER_SUPPLY()),
           () => node.salesPaused(),
 
           () => fd.nodeCount(),
-          () => fd.capacity(),
+          cachedCall("fdCap", () => fd.capacity()),
           () => fd.totalDistributed(),
           () => fd.holdersCount(),
           () => slg.balanceOf(CFG.addresses.foundingDividend),
 
           () => cd.nodeCount(),
-          () => cd.capacity(),
+          cachedCall("cdCap", () => cd.capacity()),
           () => cd.totalDistributed(),
           () => cd.holdersCount(),
           () => slg.balanceOf(CFG.addresses.coFounderDividend),
@@ -746,13 +886,17 @@
           () => ops.getStats(),
           () => ops.getTokenStats(CFG.token.slg)
         ],
-        6
+        // Batching collapses these into a couple of HTTP requests, so firing
+        // them all at once is faster than the old 6-wide queue.
+        BATCH_MAX
       ),
       runLimited(
-        Array.from({ length: LEVEL_COUNT * 2 }, (_, i) => () =>
-          i < LEVEL_COUNT ? pool.levelThresholdUSD(i) : pool.levelRateTierBps(i - LEVEL_COUNT)
+        Array.from({ length: LEVEL_COUNT * 2 }, (_, i) =>
+          cachedCall("lv" + i, () =>
+            i < LEVEL_COUNT ? pool.levelThresholdUSD(i) : pool.levelRateTierBps(i - LEVEL_COUNT)
+          )
         ),
-        6
+        BATCH_MAX
       )
     ]);
 
@@ -776,8 +920,26 @@
     }
     store.statsFailed = false;
 
+    // Persist the rare-change values so the next visit can skip those calls.
+    writeParamsCache({
+      minStake: minStake ? minStake.toString() : null,
+      maxStake: maxStake ? maxStake.toString() : null,
+      dailyRate: dailyRate ? dailyRate.toString() : null,
+      roundDuration: roundDuration ? roundDuration.toString() : null,
+      exitMultiple: exitMultiple ? exitMultiple.toString() : null,
+      bniRate: bniRate ? bniRate.toString() : null,
+      minTrigger: minTrigger ? minTrigger.toString() : null,
+      foundingSupply: foundingSupply ? foundingSupply.toString() : null,
+      coFounderSupply: coFounderSupply ? coFounderSupply.toString() : null,
+      fdCap: fdCap ? fdCap.toString() : null,
+      cdCap: cdCap ? cdCap.toString() : null,
+      ...Object.fromEntries(
+        levelValues.map((v, i) => ["lv" + i, v === null ? null : v.toString()])
+      )
+    });
+    store.paramsCache = readParamsCache();
+
     store.prices = { slg: slgPrice || null, bnb: bnbPrice || null, bni: null, manual: false };
-    store.prices.bni = await loadBniPrice();
 
     store.pool = {
       reserve: reserve || 0n,
@@ -847,21 +1009,28 @@
     }
 
     renderPublic();
+    // BNI price is only a display extra; never hold the first paint on it.
+    loadBniPrice()
+      .then((v) => {
+        if (v !== null) {
+          store.prices.bni = v;
+          renderTicker();
+        }
+      })
+      .catch(() => {});
     if (PAGE === "stake" || PAGE === "home") loadBuyback().catch(() => {});
   }
 
 
-  async function loadAccount() {
-    if (!store.account || !store.browserProvider) return;
-    const pool = readContract("stakingPool", "stakingPool", store.browserProvider);
-    const node = readContract("nodeProgram", "nodeProgram", store.browserProvider);
-    const fd = readContract("foundingDividend", "nodeDividend", store.browserProvider);
-    const cd = readContract("coFounderDividend", "nodeDividend", store.browserProvider);
-    const slg = new U.Contract(CFG.token.slg, ABI.erc20, store.browserProvider);
-    const bni = new U.Contract(CFG.token.bni, ABI.erc20, store.browserProvider);
-    const acc = store.account;
+  async function readAccountWith(runner, acc) {
+    const pool = readContract("stakingPool", "stakingPool", runner);
+    const node = readContract("nodeProgram", "nodeProgram", runner);
+    const fd = readContract("foundingDividend", "nodeDividend", runner);
+    const cd = readContract("coFounderDividend", "nodeDividend", runner);
+    const slg = new U.Contract(CFG.token.slg, ABI.erc20, runner);
+    const bni = new U.Contract(CFG.token.bni, ABI.erc20, runner);
 
-    const r = await runLimited(
+    return runLimited(
       [
         () => pool.orders(acc),
         () => pool.isMature(acc),
@@ -882,12 +1051,37 @@
         () => cd.pending(acc),
         () => node.foundingNodes(acc),
         () => node.coFounderNodes(acc),
-        () => store.browserProvider.getBalance(acc),
+        () => runner.getBalance(acc),
         () => pool.unpaidRewardUSD(acc),
         () => pool.isActiveStaker(acc)
       ],
-      6
+      BATCH_MAX
     );
+  }
+
+  async function loadAccount() {
+    if (!store.account) return;
+    // Position state is read-only. Try the probed public RPC first: wallet
+    // providers (mobile in-app browsers in particular) often reject or stall
+    // eth_call, which used to blank out every position field silently.
+    const acc = store.account;
+    const readers = [];
+    if (store.readProvider) readers.push(store.readProvider);
+    if (store.browserProvider && store.browserProvider !== store.readProvider) {
+      readers.push(store.browserProvider);
+    }
+    if (!readers.length) return;
+
+    let r = null;
+    for (let i = 0; i < readers.length; i++) {
+      r = await readAccountWith(readers[i], acc);
+      if (r[0] !== null) break;
+    }
+    // Public endpoints occasionally reject a burst; one rotation is cheaper
+    // than leaving the whole position block empty.
+    if (r[0] === null && store.readProvider && (await rotateReadProvider())) {
+      r = await readAccountWith(store.readProvider, acc);
+    }
 
     const [
       orderRaw, mature, canExit, pending, levelInfo, exitCap, capBase,
@@ -896,6 +1090,11 @@
       foundingPending, coPending, foundingNodes, coNodes, bnbBalance,
       deferredUSD, activeStaker
     ] = r;
+
+    // orders() always returns a 9-field tuple, even for an address that never
+    // staked, so null here means every RPC attempt failed. Surface that
+    // instead of silently rendering "尚未入金" with empty fields.
+    store.accountError = orderRaw === null;
 
     store.order = orderRaw
       ? {
@@ -1115,6 +1314,7 @@
     const active = !!(order && order.active);
     const mature = !!(u && u.mature);
     const canExit = !!(u && u.canExit);
+    const readFailed = !!(acc && store.accountError);
 
     let title = "读取订单中…";
     let tag = "—";
@@ -1124,6 +1324,10 @@
     if (!acc) {
       title = "未连接钱包";
       tag = "只读";
+    } else if (readFailed) {
+      title = "链上读取失败";
+      tag = "重试";
+      tagCls = "warn";
     } else if (!active) {
       title = "尚未入金";
       tag = "未激活";
@@ -1155,7 +1359,9 @@
     const round = $("roundBlock");
     if (round) round.hidden = !(active && acc);
 
-    const stakeReady = !acc || ((!active || mature) && !(store.pool && store.pool.paused) && !canExit);
+    const stakeReady =
+      !acc ||
+      (!readFailed && (!active || mature) && !(store.pool && store.pool.paused) && !canExit);
     const btnStake = $("btnStake");
     if (btnStake) {
       btnStake.textContent = "质押（SLG）";
@@ -1279,6 +1485,17 @@
     setText("roundPending", "本轮待发 " + usd(store.user ? store.user.pendingUSD : 0n));
   }
 
+  // Round a raw SLG amount up to the 6th decimal place of the *display* unit.
+  // SLG has 0 decimals, so this rounds to a whole token; the oracle quote is
+  // far coarser than 18 decimals, so trailing digits below the display
+  // precision are fake precision that only confuses the number.
+  function roundUpToDisplayQuantum(slg) {
+    const dec = store.decimals.slg;
+    const places = Math.max(0, dec - 6);
+    const step = 10n ** BigInt(places);
+    return ((slg + step - 1n) / step) * step;
+  }
+
   function applyUsdShortcut() {
     const usdEl = $("usdInput");
     const amountInput = $("amountInput");
@@ -1296,11 +1513,12 @@
       return;
     }
 
+    const clean = roundUpToDisplayQuantum(slg);
     store.syncingUsd = true;
-    amountInput.value = slgInputText(slg);
+    amountInput.value = slgInputText(clean);
     store.syncingUsd = false;
     store.autoAmount = "";
-    setText("usdHint", "≈ " + fmtUnits(slg, store.decimals.slg, 2) + " SLG");
+    setText("usdHint", "≈ " + fmtUnits(slg, store.decimals.slg, 2) + " SLG（按实时价换算）");
     updateDerived();
   }
 
@@ -1311,7 +1529,7 @@
     const amount = parseAmount($("amountInput") ? $("amountInput").value : "");
     setText(
       "amountUsd",
-      amount !== null && p.slg ? "≈ " + usd(slgUsd(amount)) : "≈ $0.00"
+      amount !== null && p.slg ? "≈ " + usd(slgUsd(amount)) : "—"
     );
 
     const rateHint = $("usdRateHint");
@@ -1410,8 +1628,23 @@
       if (!force) return;
     }
     store.refreshing = (async () => {
-      await loadPublic();
+      // Skip a duplicate public read when init() already loaded it moments ago
+      // (this happens on every wallet connect: bootstrapAccount -> refreshAll).
+      const stale =
+        !store.pool || !store.prices.slg || Date.now() - (store.publicAt || 0) > 30000;
+      if (stale) await loadPublic();
+      // Only re-route when the page is still empty; a rotation is a single
+      // probe, not a full sweep of the whole endpoint list.
+      for (let attempt = 0; attempt < 2 && (!store.pool || !store.prices.slg); attempt++) {
+        await new Promise((r) => setTimeout(r, 400 + attempt * 600));
+        try {
+          await rotateReadProvider();
+        } catch {
+        }
+        await loadPublic();
+      }
       if (store.account) await loadAccount();
+      store.publicAt = Date.now();
     })();
     try {
       await store.refreshing;
@@ -1425,7 +1658,18 @@
     return connectWallet();
   }
 
+  // Mobile wallets (TokenPocket / MetaMask app browsers) often refuse
+  // eth_estimateGas with an explicit `from`, and their eth_call simulation
+  // runs against a different RPC than the wallet's own node, so local
+  // pre-checks produce false negatives that block the user from ever
+  // sending the transaction. On mobile we skip all local gating and let
+  // the wallet itself decide; it reports its own error if the tx fails.
+  function skipLocalChecks() {
+    return isMobileUA() || /[?&]nopreflight=1/.test(location.search);
+  }
+
   async function estimateNetworkFee(tx) {
+    if (skipLocalChecks()) return null;
     const provider = store.readProvider || store.browserProvider;
     if (!provider || !store.account) return null;
     try {
@@ -1445,6 +1689,7 @@
   }
 
   async function preflight(label, fn) {
+    if (skipLocalChecks()) return true;
     try {
       await fn();
       return true;
@@ -1494,6 +1739,14 @@
     if (!(await ensureWallet())) return;
     if (!store.order) await loadAccount();
     if (!store.pool) await loadPublic();
+    if (store.user) await loadAccount();
+    if (store.account && store.user) {
+      const slgToken = new U.Contract(CFG.token.slg, ABI.erc20, store.browserProvider || store.readProvider);
+      try {
+        store.user.slgBalance = await slgToken.balanceOf(store.account);
+      } catch {
+      }
+    }
 
     if (store.user && store.user.canExit) {
       toast("warn", "已达出局线", "请使用出局按钮；此刻续押会被合约拒绝。");
@@ -1520,7 +1773,7 @@
       }
     }
 
-    if (store.user && store.user.slgBalance < amount) {
+    if (!skipLocalChecks() && store.user && store.user.slgBalance < amount) {
       toast(
         "warn",
         "SLG 余额不足",
@@ -1597,7 +1850,7 @@
       return;
     }
     const shown = fmtUnits(value, 18, 6);
-    if (store.user && store.user.bnbBalance < value) {
+    if (!skipLocalChecks() && store.user && store.user.bnbBalance < value) {
       toast(
         "warn",
         "BNB 余额不足",
@@ -1638,8 +1891,52 @@
   async function buyNode(kind) {
     if (store.busy) return;
     if (!(await ensureWallet())) return;
-    if (!store.node) await loadPublic();
-    if (!store.user) await loadAccount();
+    if (skipLocalChecks()) {
+      // Mobile: the user is waiting for the wallet popup, so fetch only the
+      // values the transaction needs and let the dashboard load afterwards.
+      if (!store.node || !store.node.foundingPrice) {
+        const c = readContract("nodeProgram", "nodeProgram");
+        const r = await runLimited(
+          [
+            () => c.foundingPrice(),
+            () => c.coFounderPrice(),
+            () => c.foundingSold(),
+            () => c.coFounderSold(),
+            () => c.FOUNDING_SUPPLY(),
+            () => c.COFOUNDER_SUPPLY(),
+            () => c.salesPaused()
+          ],
+          4
+        );
+        if (!r[0] || r[0] === 0n) {
+          toast("error", "价格读取失败", "公共节点读取失败，请稍后重试。", 9000);
+          return;
+        }
+        store.node = {
+          foundingPrice: r[0],
+          coFounderPrice: r[1] || 0n,
+          foundingSold: num(r[2]),
+          coFounderSold: num(r[3]),
+          foundingSupply: num(r[4]) || 33,
+          coFounderSupply: num(r[5]) || 99,
+          salesPaused: !!r[6]
+        };
+      }
+      loadPublic().catch(() => {});
+      loadAccount().catch(() => {});
+    } else {
+      if (!store.node) await loadPublic();
+      await loadAccount();
+    }
+    // Balances loaded at connect time go stale; a purchase must judge on the
+    // wallet's current native BNB, not the cached value.
+    if (store.account && store.user) {
+      const provider = store.browserProvider || store.readProvider;
+      try {
+        store.user.bnbBalance = await provider.getBalance(store.account);
+      } catch {
+      }
+    }
 
     const node = store.node;
     if (!node) {
@@ -1697,7 +1994,7 @@
         data: encodeCall("nodeProgram", fnName, [ref])
       });
       const fee = estimated !== null ? estimated : 2_000_000_000_000_000n;
-      if (store.user && store.user.bnbBalance < price + fee) {
+      if (!skipLocalChecks() && store.user && store.user.bnbBalance < price + fee) {
         toast(
           "error",
           "BNB 余额不足以支付网络费",
@@ -2096,9 +2393,11 @@
     renderStake();
     setText("footerVersion", CFG.version || "—");
 
+    store.paramsCache = readParamsCache();
     store.readProvider = await pickReadProvider();
     await loadTokenMeta();
     await loadPublic();
+    store.publicAt = Date.now();
     await restoreWallet();
 
     if (PAGE === "levels") renderLevels();
